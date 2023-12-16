@@ -193,7 +193,32 @@ export default {
             this.uploadRef.value.handleStart(file);
         },
         uploadBag() {
-            this.uploadDialogVisible = false;
+            this.getUploadRef().submit();
+        },
+        async customUpload({ file, onSuccess, onError }) {
+            try {
+                const formData = new FormData();
+                formData.append('file', file.raw);
+                const response = await _api.post(this.upLoadUrl, formData);
+
+                if (response.status === 200) {
+                    if (response.data.code != 200) {
+                        onError();
+                    } else {
+                        onSuccess();
+                    }
+                } else {
+                    onError();
+                }
+            } catch (error) {
+                onError();
+            }
+        },
+        uploadError() {
+            this.$message.error('上传OTA升级包失败');
+        },
+        uplodaSuccess() {
+            this.$message.success('上传OTA升级包成功');
         },
     }
 }

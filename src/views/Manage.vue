@@ -16,45 +16,47 @@
                 <el-row :gutter="30">
                     <el-col :span="12">
                         <el-form-item label="项目编号" prop="id">
-                            <el-input v-model.number="editProForm.id" placeholder="例如:61765" :maxlength="5" />
+                            <el-input v-model.number="editProForm.id" placeholder="例如:61765" :maxlength="5" disabled />
                         </el-form-item>
                     </el-col>
                     <el-col :span="12">
                         <el-form-item label="英文简称" prop="code">
-                            <el-input v-model="editProForm.code" placeholder="例如:fuge" />
+                            <el-input v-model="editProForm.code" placeholder="例如:fuge" :disabled="finalGetData" />
                         </el-form-item>
                     </el-col>
                 </el-row>
                 <el-row :gutter="30">
                     <el-col :span="12">
                         <el-form-item label="项目名称" prop="name">
-                            <el-input v-model="editProForm.name" placeholder="例如:富格蒸烤箱" />
+                            <el-input v-model="editProForm.name" placeholder="例如:富格蒸烤箱" :disabled="finalGetData" />
                         </el-form-item>
                     </el-col>
                     <el-col :span="12">
                         <el-form-item label="当前版本" prop="version">
-                            <el-input v-model="editProForm.version" placeholder="例如:V1.0.0.0" />
+                            <el-input v-model="editProForm.version" placeholder="例如:V1.0.0.0" :disabled="finalGetData" />
                         </el-form-item>
                     </el-col>
                 </el-row>
                 <el-row :gutter="30">
-                    <el-col :span="12">
+                    <el-col :span="15">
                         <el-form-item label="版本链接" prop="url">
-                            <el-tooltip class="url-tip" effect="dark" content="点击复制OTA链接至剪贴板" placement="bottom-start">
-                                <el-input v-model="editProForm.url" class="urlbox" placeholder="例如:富格蒸烤箱" @click="copyText"
-                                    readonly style="user-select: text;cursor: pointer;" />
+                            <el-tooltip class="url-tip" effect="dark" content="点击复制更新检查链接至剪贴板" placement="bottom-start">
+                                <el-input v-model="editProForm.url" class="urlbox" placeholder="用于检测当前是否存在更新"
+                                    @click="copyText" readonly style="user-select: text;cursor: pointer;" />
                             </el-tooltip>
                         </el-form-item>
                     </el-col>
-                    <el-col :span="12">
-                        <el-upload ref="uploadRef" class="select-file"
-                            action="https://run.mocky.io/v3/9d059bf9-4660-45f2-925d-ce80ad6c4d15" :limit="1"
-                            :on-exceed="handleExceed" :auto-upload="false">
+                    <el-col :span="4">
+                        <el-upload ref="uploadRef" class="select-file" :http-request="customUpload"
+                            :before-upload="beforeAvatarUpload" action="" :limit="1" :on-exceed="handleExceed"
+                            :auto-upload="false" :on-error="uploadError" :on-success="uplodaSuccess">
                             <template #trigger>
-                                <el-button type="primary">选择更新包</el-button>
-                                <el-button class="ml-3" type="success" @click="uploadBag">上传至服务器</el-button>
+                                <el-button type="primary" :disabled="finalGetData">选择更新包</el-button>
                             </template>
                         </el-upload>
+                    </el-col>
+                    <el-col :span="4">
+                        <el-button type="success" :disabled="finalGetData" @click="uploadBag">上传服务器</el-button>
                     </el-col>
                 </el-row>
 
@@ -68,6 +70,7 @@
 
 <script>
 import _api from '@/script/api'
+import { baseUrl } from '@/script/api'
 import FootView from '@/components/FootView.vue'
 import ExitBT from '@/components/ExitButton.vue'
 
@@ -81,9 +84,10 @@ export default {
         FootView
     },
     // 注册
-    editd() {
+    created() {
         this.id = this.$route.params.id;
-        this.upLoadUrl = '/upload?id=' + this.id
+        if (!this.id) backToSwitch();
+        this.upLoadUrl = '/upload?id=' + this.id;
     },
     // 渲染完成
     setup() {
@@ -113,7 +117,7 @@ export default {
         return {
             id: 0,
             upLoadUrl: '',
-            centerDialogVisible: false,
+            finalGetData: true,
 
             editProForm: {
                 id: "",
@@ -135,7 +139,35 @@ export default {
         backToSwitch() {
             this.$router.push('/switch');
         },
+
+        async getCloudData() {
+            try {
+                const formData = new FormData();
+                formData.append('file', file.raw);
+                const response = await _api.post(this.upLoadUrl, formData);
+
+                if (response.status === 200) {
+                    if (response.data.code != 200) {
+                        this.editProForm.id = response.data.data.id;
+                        this.editProForm.code = response.data.data.code;
+                        this.editProForm.name = response.data.data.name;
+                        this.editProForm.version = response.data.data.version;
+                        this.$message.error("获取项目数据成功");
+                        this.finalGetData = false;
+                        this.editProForm.url = baseUrl + '/check?id=' + this.id;
+                    } else {
+                        this.$message.error(response.data.msg);
+                    }
+                } else {
+                    this.$message.error("网络异常");
+                }
+            } catch (error) {
+                this.$message.error("网络异常");
+            }
+        },
+
         beforeAvatarUpload(rawFile) {
+            console.log("检查数据包");
             if (rawFile.type !== 'application/x-gzip') {
                 this.$message.error('仅支持上传tar.gz格式升级包!')
                 return false
@@ -143,13 +175,17 @@ export default {
             return true
         },
         copyText() {
+            if (this.finalGetData) {
+                this.$message.error("当前未获取到云端数据");
+                return;
+            }
             navigator.clipboard.writeText(this.editProForm.url)
                 .then(() => {
-                    this.$message.success("OTA升级链接已复制");
+                    this.$message.success("OTA版本检查链接已复制");
                 })
                 .catch((error) => {
                     console.error("复制内容时发生错误:", error);
-                    this.$message.warn("复制内容时发生错误");
+                    this.$message.warning("复制内容时发生错误");
                 });
         },
         handleExceed(files, fileList) {
