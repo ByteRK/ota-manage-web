@@ -79,9 +79,8 @@
 
 
         <el-dialog v-model="uploadDialogVisible" width="400px" center align-center draggable modal :show-close="false">
-            <el-upload ref="uploadRef" class="upload" drag
-                action="https://run.mocky.io/v3/9d059bf9-4660-45f2-925d-ce80ad6c4d15" :before-upload="beforeAvatarUpload"
-                :auto-upload="false" :limit="1" :on-exceed="handleExceed" multiple>
+            <el-upload ref="uploadRef" class="upload" drag :http-request="customUpload" action=""
+                :before-upload="beforeAvatarUpload" :auto-upload="false" :limit="1" :on-exceed="handleExceed" multiple>
                 <i class="upload-icon fa-duotone fa-upload fa-2x"></i>
                 <div class="el-upload__text">
                     拖动OTA升级包到此处或者 <em>点击选择文件</em>
@@ -102,6 +101,7 @@
 import FootView from '@/components/FootView.vue'
 import ExitBT from '@/components/ExitButton.vue'
 
+import _api from '@/script/api'
 import { checkString, checkNumber } from '@/script/checkFrom'
 import { ref, onMounted } from 'vue'
 import { genFileId } from 'element-plus'
@@ -116,32 +116,17 @@ export default {
     setup() {
         const createFromRef = ref(null);
         const uploadRef = ref(null);
-
-        const getCreateFromRef = () => {
-            return createFromRef.value;
-        }
-        const getUploadRef = () => {
-            return uploadRef.value;
-        }
-
-        onMounted(() => {
-        });
-
         return {
             createFromRef,
             uploadRef,
-            getCreateFromRef,
-            getUploadRef,
         }
     },
     data() {
+        this.getProjectList();
         return {
             btEnable: true,
+            projectList: [],
             projectSetect: "",
-            projectList: [
-                { "id": 1, "name": "富格", "version": "V1.0.0" },
-                { "id": 2, "name": "凯度", "version": "V1.0.0" }
-            ],
 
             centerDialogVisible: false,
             createProForm: {
@@ -150,6 +135,7 @@ export default {
                 name: "",
                 version: "",
             },
+            createFromRef: null,
             createProFormRules: {
                 id: [{ validator: checkNumber, trigger: 'blur' },],
                 code: [{ validator: checkString, trigger: 'blur' },],
@@ -157,21 +143,42 @@ export default {
                 version: [{ validator: checkString, trigger: 'blur' },],
             },
 
+            uploadRef: null,
+            upLoadUrl: '',
             uploadDialogVisible: false,
         }
     },
     methods: {
+        async getProjectList() {
+            try {
+                const response = await _api.get('/prjList');
+                if (response.status === 200) {
+                    if (response.data.code === 200) {
+                        this.projectList = response.data.data.list;
+                        this.$message.success("获取项目列表成功");
+                    } else {
+                        this.$message.error(response.data.message);
+                    }
+                } else {
+                    this.$message.error("网络异常");
+                }
+            } catch (error) {
+                this.$message.error("网络异常");
+            }
+        },
+
         selectChange() {
             if (this.projectSetect != "") this.btEnable = false;
         },
         enter() {
-            console.log(this.projectSetect);
+            console.log("选择了项目：" + this.projectSetect);
             this.$router.push({ name: 'manage', params: { id: this.projectSetect } });
         },
         toUpload() {
             if (!this.createFromRef) return;
-            this.getCreateFromRef().validate(async (valid) => {
+            this.createFromRef.validate(async (valid) => {
                 if (valid) {
+                    this.upLoadUrl = "/upload?id=" + this.createProForm.id;
                     this.uploadDialogVisible = true;
                 } else {
                     this.$message.warning("蠢猪！！！看错误提示🙈");
@@ -187,13 +194,13 @@ export default {
         },
         handleExceed(files, fileList) {
             this.$message.warning(`当前限制选择 1 个文件，本次选择了 ${ files.length } 个文件`);
-            this.uploadRef.value.clearFiles();
+            this.uploadRef.clearFiles();
             const file = files[0];
             file.uid = genFileId();
-            this.uploadRef.value.handleStart(file);
+            this.uploadRef.handleStart(file);
         },
         uploadBag() {
-            this.getUploadRef().submit();
+            this.uploadRef.submit();
         },
         async customUpload({ file, onSuccess, onError }) {
             try {

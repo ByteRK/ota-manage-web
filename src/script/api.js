@@ -6,8 +6,8 @@ const _api = axios.create({ baseURL: baseUrl, timeout: 10000 });
 // 配置axios请求拦截器
 _api.interceptors.request.use(config => {
     // console.log(window.sessionStorage.getItem('token'))
-    console.log(config)
-    config.headers.token = window.sessionStorage.getItem('token')
+    // console.log(config)
+    config.headers.coffee = window.sessionStorage.getItem('coffee')
     // console.log(config)
     return config
 }, error => {

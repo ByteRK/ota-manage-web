@@ -43,11 +43,10 @@ export default {
         FootView
     },
     created() {
-        window.sessionStorage.clear()
+        window.sessionStorage.clear();
     },
     setup() {
         const loginFormRef = ref(null);
-
         return {
             loginFormRef,
         }
@@ -62,6 +61,7 @@ export default {
             else { return callback() }
         }
         return {
+            loginFormRef: null,
             loginForm: {
                 username: 'sanboen',
                 password: 'sanboen'

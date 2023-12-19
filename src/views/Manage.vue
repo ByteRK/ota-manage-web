@@ -48,19 +48,27 @@
                     </el-col>
                     <el-col :span="4">
                         <el-upload ref="uploadRef" class="select-file" :http-request="customUpload"
-                            :before-upload="beforeAvatarUpload" action="" :limit="1" :on-exceed="handleExceed"
-                            :auto-upload="false" :on-error="uploadError" :on-success="uplodaSuccess">
+                            :before-upload="beforeAvatarUpload" action="http://localhost:3007/upload?id=90" :limit="1"
+                            :on-exceed="handleExceed" :auto-upload="false" :on-error="uploadError"
+                            :on-success="uplodaSuccess">
                             <template #trigger>
-                                <el-button type="primary" :disabled="finalGetData">选择更新包</el-button>
+                                <el-button type="warning" :disabled="finalGetData">选择更新包</el-button>
                             </template>
                         </el-upload>
                     </el-col>
                     <el-col :span="4">
-                        <el-button type="success" :disabled="finalGetData" @click="uploadBag">上传服务器</el-button>
+                        <el-button type="danger" :disabled="finalGetData" @click="uploadBag">上传服务器</el-button>
                     </el-col>
                 </el-row>
 
             </el-form>
+
+            <el-button type="primary" size="large" @click="update">
+                <template #loading>
+                    <i class="fa-duotone fa-loader"></i>
+                </template>
+                更新项目信息
+            </el-button>
 
         </div>
 
@@ -74,7 +82,7 @@ import { baseUrl } from '@/script/api'
 import FootView from '@/components/FootView.vue'
 import ExitBT from '@/components/ExitButton.vue'
 
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { genFileId } from 'element-plus'
 import { checkString, checkNumber } from '@/script/checkFrom'
 
@@ -83,55 +91,36 @@ export default {
         ExitBT,
         FootView
     },
+    // 渲染完成
+    setup() {
+        const editFromRef = ref(null);
+        const uploadRef = ref(null);
+        return {
+            uploadRef,
+            editFromRef,
+        }
+    },
     // 注册
     created() {
         this.id = this.$route.params.id;
         if (!this.id) backToSwitch();
-        this.upLoadUrl = '/upload?id=' + this.id;
+        this.upLoadUrl = "/upload?id=" + this.id;
+        this.getProjectInfo();
     },
-    // 渲染完成
-    setup() {
-        const createFromRef = ref(null);
-        const uploadRef = ref(null);
-
-        const getUploadRef = () => {
-            return uploadRef.value;
-        }
-
-        const getCreateFromRef = () => {
-            return createFromRef.value;
-        }
-
-        onMounted(() => {
-        });
-
-        return {
-            uploadRef,
-            createFromRef,
-            getUploadRef,
-            getCreateFromRef,
-        }
-    },
-    // 普通数据
     data() {
         return {
             id: 0,
             upLoadUrl: '',
-            finalGetData: true,
+            finalGetData: false,
 
-            editProForm: {
-                id: "",
-                code: "",
-                name: "",
-                version: "",
-                url: "",
-            },
+            editProForm: {},
             editProFormRules: {
                 id: [{ validator: checkNumber, trigger: 'blur' },],
                 code: [{ validator: checkString, trigger: 'blur' },],
                 name: [{ validator: checkString, trigger: 'blur' },],
                 version: [{ validator: checkString, trigger: 'blur' },],
             },
+            uploadRef: null,
         }
     },
     // 一些函数
@@ -140,21 +129,15 @@ export default {
             this.$router.push('/switch');
         },
 
-        async getCloudData() {
+        async getProjectInfo() {
             try {
-                const formData = new FormData();
-                formData.append('file', file.raw);
-                const response = await _api.post(this.upLoadUrl, formData);
-
+                const response = await _api.get('/prjInfo?id=' + this.id);
                 if (response.status === 200) {
-                    if (response.data.code != 200) {
-                        this.editProForm.id = response.data.data.id;
-                        this.editProForm.code = response.data.data.code;
-                        this.editProForm.name = response.data.data.name;
-                        this.editProForm.version = response.data.data.version;
-                        this.$message.error("获取项目数据成功");
-                        this.finalGetData = false;
+                    if (response.data.code === 200) {
+                        this.editProForm = response.data.data.info;
                         this.editProForm.url = baseUrl + '/check?id=' + this.id;
+                        this.finalGetData = false;
+                        this.$message.success("获取项目数据成功");
                     } else {
                         this.$message.error(response.data.msg);
                     }
@@ -164,15 +147,6 @@ export default {
             } catch (error) {
                 this.$message.error("网络异常");
             }
-        },
-
-        beforeAvatarUpload(rawFile) {
-            console.log("检查数据包");
-            if (rawFile.type !== 'application/x-gzip') {
-                this.$message.error('仅支持上传tar.gz格式升级包!')
-                return false
-            }
-            return true
         },
         copyText() {
             if (this.finalGetData) {
@@ -188,27 +162,50 @@ export default {
                     this.$message.warning("复制内容时发生错误");
                 });
         },
+        readFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const rawData = event.target.result;
+                    resolve(rawData);
+                };
+                reader.onerror = (event) => {
+                    reject(event.target.error);
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        },
+
+        beforeAvatarUpload(rawFile) {
+            console.log("检查数据包");
+            if (rawFile.type !== 'application/x-gzip') {
+                this.$message.error('仅支持上传tar.gz格式升级包!')
+                return false
+            }
+            return true
+        },
         handleExceed(files, fileList) {
             this.$message.warning(`只能上传一个文件，本次选择了 ${ files.length } 个文件`);
-            this.getUploadRef().clearFiles();
+            console.log(files)
+            this.uploadRef.clearFiles();
             const file = files[0];
             file.uid = genFileId();
-            this.getUploadRef().handleStart(file);
+            this.uploadRef.handleStart(file);
         },
         uploadBag() {
-            this.getUploadRef().submit();
+            this.uploadRef.submit();
         },
         async customUpload({ file, onSuccess, onError }) {
             try {
                 const formData = new FormData();
-                formData.append('file', file.raw);
+                formData.append('file', file);
                 const response = await _api.post(this.upLoadUrl, formData);
 
                 if (response.status === 200) {
-                    if (response.data.code != 200) {
-                        onError();
-                    } else {
+                    if (response.data.code === 200) {
                         onSuccess();
+                    } else {
+                        onError();
                     }
                 } else {
                     onError();
@@ -223,7 +220,7 @@ export default {
         uplodaSuccess() {
             this.$message.success('上传OTA升级包成功');
         },
-        login() {
+        update() {
         }
     }
 }
