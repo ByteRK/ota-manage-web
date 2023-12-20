@@ -135,7 +135,7 @@ export default {
                 if (response.status === 200) {
                     if (response.data.code === 200) {
                         this.editProForm = response.data.data.info;
-                        this.editProForm.url = baseUrl + '/check?id=' + this.id;
+                        this.editProForm.url = baseUrl + '/getVersion?id=' + this.id;
                         this.finalGetData = false;
                         this.$message.success("获取项目数据成功");
                     } else {
@@ -220,7 +220,29 @@ export default {
         uplodaSuccess() {
             this.$message.success('上传OTA升级包成功');
         },
-        update() {
+        async update() {
+            try {
+                const response = await _api.post('/updatePrj', {
+                    'id': this.editProForm.id,
+                    'code': this.editProForm.code,
+                    'name': this.editProForm.name,
+                    'version': this.editProForm.version,
+                });
+                if (response.status === 200) {
+                    if (response.data.code === 200) {
+                        this.editProForm = response.data.data.info;
+                        this.editProForm.url = baseUrl + '/getVersion?id=' + this.id;
+                        this.finalGetData = false;
+                        this.$message.success("更新项目信息成功");
+                    } else {
+                        this.$message.error(response.data.msg);
+                    }
+                } else {
+                    this.$message.error("网络异常");
+                }
+            } catch (error) {
+                this.$message.error("网络异常");
+            }
         }
     }
 }

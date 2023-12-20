@@ -80,7 +80,8 @@
 
         <el-dialog v-model="uploadDialogVisible" width="400px" center align-center draggable modal :show-close="false">
             <el-upload ref="uploadRef" class="upload" drag :http-request="customUpload" action=""
-                :before-upload="beforeAvatarUpload" :auto-upload="false" :limit="1" :on-exceed="handleExceed" multiple>
+                :before-upload="beforeAvatarUpload" :auto-upload="false" :limit="1" :on-exceed="handleExceed"
+                :on-error="uploadError" :on-success="uplodaSuccess" multiple>
                 <i class="upload-icon fa-duotone fa-upload fa-2x"></i>
                 <div class="el-upload__text">
                     拖动OTA升级包到此处或者 <em>点击选择文件</em>
@@ -178,6 +179,12 @@ export default {
             if (!this.createFromRef) return;
             this.createFromRef.validate(async (valid) => {
                 if (valid) {
+                    for (let index in this.projectList) {
+                        if (this.projectList[index].id == this.createProForm.id) {
+                            this.$message.error("项目ID已存在");
+                            return;
+                        }
+                    }
                     this.upLoadUrl = "/upload?id=" + this.createProForm.id;
                     this.uploadDialogVisible = true;
                 } else {
@@ -205,14 +212,15 @@ export default {
         async customUpload({ file, onSuccess, onError }) {
             try {
                 const formData = new FormData();
-                formData.append('file', file.raw);
+                formData.append('file', file);
                 const response = await _api.post(this.upLoadUrl, formData);
 
                 if (response.status === 200) {
-                    if (response.data.code != 200) {
-                        onError();
-                    } else {
+                    if (response.data.code === 200) {
+                        this.createPrj();
                         onSuccess();
+                    } else {
+                        onError();
                     }
                 } else {
                     onError();
@@ -226,6 +234,29 @@ export default {
         },
         uplodaSuccess() {
             this.$message.success('上传OTA升级包成功');
+        },
+        async createPrj() {
+            try {
+                const response = await _api.post('/addPrj', {
+                    'id': this.createProForm.id,
+                    'code': this.createProForm.code,
+                    'name': this.createProForm.name,
+                    'version': this.createProForm.version,
+                });
+                if (response.status === 200) {
+                    if (response.data.code === 200) {
+                        this.finalGetData = false;
+                        this.$message.success("新增项目成功,即将跳转");
+                        this.$router.push({ name: 'manage', params: { id: this.createProForm.id } });
+                    } else {
+                        this.$message.error(response.data.msg);
+                    }
+                } else {
+                    this.$message.error("网络异常");
+                }
+            } catch (error) {
+                this.$message.error("网络异常");
+            }
         },
     }
 }
