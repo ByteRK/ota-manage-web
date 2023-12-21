@@ -63,8 +63,8 @@ export default {
         return {
             loginFormRef: null,
             loginForm: {
-                username: 'sanboen',
-                password: 'sanboen'
+                username: '',
+                password: ''
             },
             loginFormRules: {
                 username: [{ validator: checkid, trigger: 'blur' },],
